@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Partner Treat</title>
+
+<style>
+:root{
+  --bg:#020617;
+  --card:#0f172a;
+  --primary:#3b82f6;
+  --success:#22c55e;
+  --text:#e2e8f0;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
+  background:var(--bg);
+  color:var(--text);
+}
+
+/* glow */
+body::before{
+  content:"";
+  position:fixed;
+  width:500px;
+  height:500px;
+  background:radial-gradient(circle,#2563eb,transparent);
+  top:-150px;
+  left:-100px;
+  filter:blur(120px);
+}
+
+/* layout */
+.container{
+  max-width:420px;
+  margin:auto;
+  padding:20px;
+}
+
+/* card */
+.card{
+  background:rgba(15,23,42,0.85);
+  backdrop-filter:blur(20px);
+  border-radius:24px;
+  padding:20px;
+  margin-top:20px;
+  box-shadow:0 25px 60px rgba(0,0,0,0.5);
+}
+
+/* header */
+.header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.title{
+  font-size:20px;
+  font-weight:700;
+}
+
+/* badge */
+.badge{
+  background:var(--success);
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:12px;
+}
+
+/* input */
+input, textarea{
+  width:100%;
+  padding:14px;
+  border-radius:14px;
+  border:none;
+  margin-top:10px;
+  background:#1e293b;
+  color:white;
+}
+
+/* button */
+button{
+  width:100%;
+  padding:14px;
+  border:none;
+  border-radius:14px;
+  margin-top:12px;
+  background:var(--primary);
+  color:white;
+  font-weight:600;
+  cursor:pointer;
+  transition:.2s;
+}
+
+button:hover{
+  transform:scale(1.02);
+}
+
+/* list item */
+.item{
+  background:var(--card);
+  border-radius:16px;
+  padding:14px;
+  margin-top:12px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  transition:.25s;
+}
+
+.item.used{
+  background:#064e3b;
+  opacity:0.8;
+}
+
+/* text */
+.code{
+  font-weight:700;
+  letter-spacing:2px;
+}
+
+.blur{
+  filter:blur(6px);
+}
+
+/* action */
+.actions{
+  display:flex;
+  gap:8px;
+}
+
+.icon{
+  width:34px;
+  height:34px;
+  border-radius:10px;
+  background:#1e293b;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+}
+
+.use{
+  padding:6px 10px;
+  border-radius:10px;
+  background:var(--primary);
+  font-size:12px;
+}
+
+/* empty */
+.empty{
+  text-align:center;
+  opacity:0.6;
+  margin-top:20px;
+}
+
+/* hidden */
+.hidden{display:none}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="card" id="setup">
+  <div class="title">Nhập mã tháng</div>
+  <textarea id="codes"></textarea>
+  <button onclick="save()">Lưu mã</button>
+</div>
+
+<div class="card hidden" id="login">
+  <div class="title">Nhập PIN</div>
+  <input type="password" id="pin">
+  <button onclick="login()">Đăng nhập</button>
+</div>
+
+<div class="card hidden" id="app">
+  <div class="header">
+    <div class="title">Partner Treat</div>
+    <div class="badge" id="remain"></div>
+  </div>
+
+  <div id="list"></div>
+
+  <button onclick="reset()">Reset</button>
+</div>
+
+</div>
+
+<script>
+const KEY="APP_V2";
+
+const store={
+  get:()=>JSON.parse(localStorage.getItem(KEY)),
+  set:(d)=>localStorage.setItem(KEY,JSON.stringify(d)),
+  clear:()=>localStorage.removeItem(KEY)
+};
+
+function init(){
+  const data=store.get();
+  if(!data) return show("setup");
+
+  if(data.month!==new Date().getMonth()){
+    store.clear();
+    return show("setup");
+  }
+
+  show("login");
+}
+
+function show(id){
+  ["setup","login","app"].forEach(x=>{
+    document.getElementById(x).classList.add("hidden");
+  });
+  document.getElementById(id).classList.remove("hidden");
+}
+
+function save(){
+  const raw=document.getElementById("codes").value.trim();
+  if(!raw) return alert("Nhập mã");
+
+  const codes=raw.split("\n")
+    .map(x=>x.trim())
+    .filter(Boolean)
+    .map(x=>({code:x,used:false,show:false}));
+
+  store.set({
+    pin:"2005",
+    codes,
+    month:new Date().getMonth()
+  });
+
+  show("login");
+}
+
+function login(){
+  const pin=document.getElementById("pin").value;
+  const data=store.get();
+  if(pin!==data.pin) return alert("Sai PIN");
+
+  render();
+  show("app");
+}
+
+function render(){
+  const data=store.get();
+  const list=document.getElementById("list");
+
+  list.innerHTML="";
+
+  if(!data.codes.length){
+    list.innerHTML=`<div class="empty">Không có mã</div>`;
+    return;
+  }
+
+  let remain=0;
+
+  data.codes.forEach((c,i)=>{
+    if(!c.used) remain++;
+
+    const item=document.createElement("div");
+    item.className="item"+(c.used?" used":"");
+
+    const code=document.createElement("div");
+    code.className="code"+(c.show?"":" blur");
+    code.textContent=c.code;
+
+    const actions=document.createElement("div");
+    actions.className="actions";
+
+    const eye=document.createElement("div");
+    eye.className="icon";
+    eye.textContent=c.show?"🙈":"👁";
+
+    eye.onclick=(e)=>{
+      e.stopPropagation();
+      c.show=!c.show;
+      store.set(data);
+      render();
+    };
+
+    const use=document.createElement("div");
+    use.className="use";
+    use.textContent=c.used?"Đã dùng":"Dùng";
+
+    use.onclick=(e)=>{
+      e.stopPropagation();
+      c.used=!c.used;
+      store.set(data);
+      render();
+    };
+
+    actions.appendChild(eye);
+    actions.appendChild(use);
+
+    item.appendChild(code);
+    item.appendChild(actions);
+
+    list.appendChild(item);
+  });
+
+  document.getElementById("remain").textContent=remain+" còn";
+}
+
+function reset(){
+  if(confirm("Reset toàn bộ?")){
+    store.clear();
+    location.reload();
+  }
+}
+
+init();
+</script>
+
+</body>
+</html>
